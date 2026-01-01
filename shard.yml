@@ -1,0 +1,17 @@
+name: lucid
+version: 0.1.0
+
+authors:
+  - User <user@example.com>
+
+description: |
+  A Model Context Protocol (MCP) SDK for Crystal.
+
+dependencies:
+  # Standard library JSON is used, no external deps for core yet.
+
+targets:
+  lucid:
+    main: src/lucid.cr
+
+license: MIT
