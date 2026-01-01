@@ -26,6 +26,10 @@ See `examples/math_server.cr`:
 crystal run examples/math_server.cr
 ```
 
+## Docs
+
+See `docs/README.md`.
+
 ## Development
 
 ```bash
