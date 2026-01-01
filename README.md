@@ -9,7 +9,7 @@ Add to your `shard.yml`:
 ```yml
 dependencies:
   lucid:
-    github: <your-org-or-user>/lucid
+    github: https://github.com/slime21023/lucid
 ```
 
 Then:
