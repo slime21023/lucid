@@ -11,5 +11,5 @@ require "./mcp/client"
 # `require "lucid"` (which loads this file) and then use `Mcp::Server` and
 # `Mcp::Client`.
 module Mcp
-  VERSION = Lucid::VERSION
+  VERSION = "0.1.0"
 end

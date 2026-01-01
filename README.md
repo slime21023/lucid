@@ -34,13 +34,19 @@ crystal spec
 
 ## Coverage
 
-Line coverage is generated on Linux via `kcov`:
+Coverage is generated via Crystal's built-in reachability analysis (`crystal tool unreachable`):
 
 ```bash
 bash scripts/coverage.sh
 ```
 
-The HTML report is written to `coverage/index.html`. In CI, the report is uploaded as a workflow artifact.
+Outputs are written to `coverage/` (JSON + CSV + summary). In CI, the report is uploaded as a workflow artifact.
+
+On Windows, run:
+
+```powershell
+powershell -File scripts/coverage.ps1
+```
 
 ## Current Features
 

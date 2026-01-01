@@ -24,10 +24,11 @@ Prefer extending existing modules under `src/mcp/**` and keep public API additio
 
 ## Coverage Reporting
 
-Line coverage is generated on Linux via `kcov`:
+Coverage is generated via Crystal's built-in reachability analysis (`crystal tool unreachable`):
 
-- `bash scripts/coverage.sh` — writes an HTML report to `coverage/index.html`.
-- GitHub Actions also generates and uploads `coverage/` as a workflow artifact (`.github/workflows/ci.yml`).
+- `bash scripts/coverage.sh` — writes `coverage/coverage.json`, `coverage/unreachable.csv`, and `coverage/summary.txt`.
+- On Windows: `powershell -File scripts/coverage.ps1`.
+- GitHub Actions generates and uploads `coverage/` as a workflow artifact (`.github/workflows/ci.yml`).
 
 ## Coding Style & Naming Conventions
 

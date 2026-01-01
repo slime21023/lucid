@@ -38,7 +38,7 @@ module Mcp
     end
 
     # Performs MCP initialize handshake and sends `notifications/initialized`.
-    def connect(name : String, version : String)
+    def connect(name : String, version : String) : Protocol::Result | Protocol::Error
       params = Types::InitializeParams.new(
         protocol_version: "2024-11-05",
         capabilities: Types::Capabilities.new(
@@ -61,7 +61,7 @@ module Mcp
     end
 
     # Requests `tools/list`.
-    def list_tools
+    def list_tools : Protocol::Result | Protocol::Error
       send_request(Protocol::Methods::TOOLS_LIST)
     end
 
@@ -70,7 +70,7 @@ module Mcp
     end
 
     # Requests `tools/call` with `arguments` encoded from a `Hash`/`NamedTuple`.
-    def call_tool(name : String, args : Hash(String, _) | NamedTuple)
+    def call_tool(name : String, args : Hash(String, _) | NamedTuple) : Protocol::Result | Protocol::Error
       params = Types::ToolsCallParams.new(
         name: name,
         arguments: JSON.parse(args.to_json)
@@ -128,7 +128,7 @@ module Mcp
       end
     end
 
-    private def decode_typed(response : Protocol::Result | Protocol::Error, type : T.class) : T | Protocol::Error forall T
+    private def decode_typed(response : Protocol::Message, type : T.class) : T | Protocol::Error forall T
       case response
       when Protocol::Result
         begin
@@ -142,8 +142,16 @@ module Mcp
             response.id
           )
         end
-      else
+      when Protocol::Error
         response
+      else
+        Protocol::Error.new(
+          Protocol::Error::ErrorData.new(
+            Protocol::Error::INTERNAL_ERROR,
+            "Unexpected response type: #{response.class}"
+          ),
+          nil
+        )
       end
     end
   end
