@@ -10,6 +10,12 @@ crystal spec
 
 This project uses `crystal tool unreachable` as a method-level reachability report (a coverage proxy).
 
+Direct (prints a per-method tally):
+
+```bash
+crystal tool unreachable --tallies -f text spec/runner.cr
+```
+
 Linux/macOS (bash):
 
 ```bash

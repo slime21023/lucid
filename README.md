@@ -66,6 +66,6 @@ powershell -File scripts/coverage.ps1
 
 ## Roadmap
 
-- Resources / Prompts / Roots / Logging capabilities
-- Expand typed coverage (more capabilities/content types)
-- More transports (TCP / WebSocket)
+- [x] Resources / Prompts / Roots / Logging capabilities
+- [x] Expand typed coverage (more capabilities)
+- [x] More transports (TCP / WebSocket)

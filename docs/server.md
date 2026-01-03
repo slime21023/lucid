@@ -1,4 +1,4 @@
-﻿# Server (Tools)
+﻿# Server
 
 ## Overview
 
@@ -9,6 +9,11 @@ Currently supported core methods:
 - `initialize`
 - `tools/list`
 - `tools/call`
+- `resources/list`
+- `resources/read`
+- `prompts/list`
+- `prompts/get`
+- `logging/setLevel`
 
 Canonical method names are defined in `Mcp::Protocol::Methods`.
 
@@ -29,6 +34,61 @@ What the DSL does:
 - Generates an args struct and decodes it from `arguments`
 - Generates a minimal JSON Schema (`type/properties/required`) for `tools/list`
 
+## Defining Resources
+
+Register resources on a server instance (typically in `initialize`):
+
+```crystal
+class MyServer < Mcp::Server
+  def initialize(transport : Mcp::Transport::Base)
+    super(transport)
+
+    resources.register(
+      "file://example.txt",
+      name: "example",
+      description: "An example resource",
+      mime_type: "text/plain"
+    ) do
+      "Hello"
+    end
+  end
+end
+```
+
+The handler must return a `String` which becomes the `text` field in `resources/read`.
+
+## Defining Prompts
+
+Register prompts on a server instance:
+
+```crystal
+class MyServer < Mcp::Server
+  def initialize(transport : Mcp::Transport::Base)
+    super(transport)
+
+    prompts.register(
+      "greet",
+      description: "Greets the user",
+      arguments: [Mcp::Types::PromptArgument.new(name: "name", required: true)]
+    ) do |args|
+      name = args.try &.[]?("name").try &.as_s? || "world"
+      Mcp::Types::PromptsGetResult.new(
+        messages: [Mcp::Types::PromptMessage.new(role: "user", content: "Hello, #{name}!")]
+      )
+    end
+  end
+end
+```
+
+## Logging
+
+The server can emit logs to the host via `logging/message` notifications:
+
+```crystal
+server.log_info("Started", "my-server")
+server.log_error("Something failed")
+```
+
 ## Tool Handler Return Values
 
 The tool block result is converted to JSON:
@@ -42,3 +102,11 @@ The tool block result is converted to JSON:
 - `tools/call` missing params: `INVALID_PARAMS`
 - Unknown tool name: `METHOD_NOT_FOUND`
 - Tool handler exception: `INTERNAL_ERROR`
+
+## Host Capabilities (Roots)
+
+`roots/list` is a host (client) capability. Servers can request it with:
+
+```crystal
+roots = server.list_roots_typed
+```

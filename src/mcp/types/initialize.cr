@@ -32,6 +32,33 @@ module Mcp
       end
     end
 
+    # MCP resources capability flags.
+    struct ResourcesCapabilities
+      include JSON::Serializable
+      @[JSON::Field(key: "listChanged")]
+      property list_changed : Bool?
+
+      def initialize(@list_changed : Bool? = nil)
+      end
+    end
+
+    # MCP prompts capability flags.
+    struct PromptsCapabilities
+      include JSON::Serializable
+      @[JSON::Field(key: "listChanged")]
+      property list_changed : Bool?
+
+      def initialize(@list_changed : Bool? = nil)
+      end
+    end
+
+    # MCP logging capability flags.
+    struct LoggingCapabilities
+      include JSON::Serializable
+      def initialize
+      end
+    end
+
     # MCP roots capability flags.
     struct RootsCapabilities
       include JSON::Serializable
@@ -46,9 +73,18 @@ module Mcp
     struct Capabilities
       include JSON::Serializable
       property tools : ToolsCapabilities?
+      property resources : ResourcesCapabilities?
+      property prompts : PromptsCapabilities?
+      property logging : LoggingCapabilities?
       property roots : RootsCapabilities?
 
-      def initialize(@tools : ToolsCapabilities? = nil, @roots : RootsCapabilities? = nil)
+      def initialize(
+        @tools : ToolsCapabilities? = nil,
+        @resources : ResourcesCapabilities? = nil,
+        @prompts : PromptsCapabilities? = nil,
+        @logging : LoggingCapabilities? = nil,
+        @roots : RootsCapabilities? = nil
+      )
       end
     end
 

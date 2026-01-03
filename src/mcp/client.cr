@@ -5,6 +5,11 @@ require "./protocol/id"
 require "./types/initialize"
 require "./types/tools"
 require "./types/content"
+require "./types/common"
+require "./types/logging"
+require "./types/prompts"
+require "./types/resources"
+require "./types/roots"
 require "./json_any"
 
 module Mcp
@@ -15,17 +20,28 @@ module Mcp
   # - `client.start`
   # - `client.connect("my-app", "0.1.0")`
   #
-  # For typed responses, use `connect_typed`, `list_tools_typed`, and
-  # `call_tool_typed`.
+  # Typed response helpers decode `Protocol::Result#result` into `Mcp::Types::*`.
+  #
+  # This client can also act as the host side for certain server->host calls:
+  # - Responds to `roots/list` requests (see `add_root` / `on_roots_list`)
+  # - Receives `logging/message` notifications (see `on_logging_message`)
   class Client
     property transport : Mcp::Transport::Base
+
+    # Roots advertised by this client when serving `roots/list`.
+    getter roots : Array(Types::Root)
 
     # Simple ID counter for requests
     @request_id = 0_i64
     # Map of ID key to Channel for responses (id can be String or Int)
     @pending_requests = Hash(String, Channel(Protocol::Result | Protocol::Error)).new
+    @on_roots_list : Proc(Types::RootsListResult)?
+    @on_logging_message : Proc(Types::LoggingMessageParams, Nil)?
 
     def initialize(@transport : Mcp::Transport::Base)
+      @roots = [] of Types::Root
+      @on_roots_list = nil
+      @on_logging_message = nil
       @transport.on_message = ->(msg : Protocol::Message) {
         handle_message(msg)
         nil
@@ -43,7 +59,10 @@ module Mcp
         protocol_version: "2024-11-05",
         capabilities: Types::Capabilities.new(
           roots: Types::RootsCapabilities.new(list_changed: true),
-          tools: nil
+          tools: nil,
+          resources: nil,
+          prompts: nil,
+          logging: nil
         ),
         client_info: Types::ClientInfo.new(name: name, version: version)
       )
@@ -80,6 +99,87 @@ module Mcp
 
     def call_tool_typed(name : String, args : Hash(String, _) | NamedTuple) : Types::ToolCallResult | Protocol::Error
       decode_typed(call_tool(name, args), Types::ToolCallResult)
+    end
+
+    # Requests `resources/list`.
+    def list_resources : Protocol::Result | Protocol::Error
+      send_request(Protocol::Methods::RESOURCES_LIST)
+    end
+
+    def list_resources_typed : Types::ResourcesListResult | Protocol::Error
+      decode_typed(list_resources, Types::ResourcesListResult)
+    end
+
+    # Requests `resources/read`.
+    #
+    # Returns a `resources/read` JSON-RPC response where `result.contents` contains
+    # one or more content items for the given URI.
+    def read_resource(uri : String) : Protocol::Result | Protocol::Error
+      params = Types::ResourcesReadParams.new(uri: uri)
+      send_request(Protocol::Methods::RESOURCES_READ, Json.to_any(params))
+    end
+
+    def read_resource_typed(uri : String) : Types::ResourcesReadResult | Protocol::Error
+      decode_typed(read_resource(uri), Types::ResourcesReadResult)
+    end
+
+    # Requests `prompts/list`.
+    def list_prompts : Protocol::Result | Protocol::Error
+      send_request(Protocol::Methods::PROMPTS_LIST)
+    end
+
+    def list_prompts_typed : Types::PromptsListResult | Protocol::Error
+      decode_typed(list_prompts, Types::PromptsListResult)
+    end
+
+    # Requests `prompts/get`.
+    #
+    # `args` are passed through as the JSON-RPC `arguments` field.
+    def get_prompt(name : String, args : JSON::Any? = nil) : Protocol::Result | Protocol::Error
+      params = Types::PromptsGetParams.new(name: name, arguments: args)
+      send_request(Protocol::Methods::PROMPTS_GET, Json.to_any(params))
+    end
+
+    def get_prompt(name : String, args : Hash(String, _) | NamedTuple) : Protocol::Result | Protocol::Error
+      get_prompt(name, JSON.parse(args.to_json))
+    end
+
+    def get_prompt_typed(name : String, args : JSON::Any? = nil) : Types::PromptsGetResult | Protocol::Error
+      decode_typed(get_prompt(name, args), Types::PromptsGetResult)
+    end
+
+    def get_prompt_typed(name : String, args : Hash(String, _) | NamedTuple) : Types::PromptsGetResult | Protocol::Error
+      decode_typed(get_prompt(name, args), Types::PromptsGetResult)
+    end
+
+    # Sends `logging/setLevel`.
+    #
+    # The server may interpret this as the desired minimum log level for
+    # subsequent `logging/message` notifications.
+    def set_log_level(level : String) : Protocol::Result | Protocol::Error
+      params = Types::LoggingSetLevelParams.new(level: level)
+      send_request(Protocol::Methods::LOGGING_SET_LEVEL, Json.to_any(params))
+    end
+
+    def set_log_level_typed(level : String) : Types::EmptyResult | Protocol::Error
+      decode_typed(set_log_level(level), Types::EmptyResult)
+    end
+
+    # Adds a root entry to be returned for incoming `roots/list` requests.
+    def add_root(uri : String, name : String? = nil)
+      @roots << Types::Root.new(uri: uri, name: name)
+    end
+
+    # Sets a handler for incoming `roots/list` requests.
+    #
+    # If unset, the client will respond with `roots` (as built via `add_root`).
+    def on_roots_list(&block : -> Types::RootsListResult)
+      @on_roots_list = block
+    end
+
+    # Sets a callback for incoming `logging/message` notifications.
+    def on_logging_message(&block : Types::LoggingMessageParams -> Nil)
+      @on_logging_message = block
     end
 
     private def next_id
@@ -122,9 +222,44 @@ module Mcp
           end
         end
       when Protocol::Request
-        # Server calling client (e.g. sampling?) - Not implemented yet
+        handle_request(message)
       when Protocol::Notification
-        # Server notifications - Not implemented yet
+        handle_notification(message)
+      end
+    end
+
+    private def handle_request(request : Protocol::Request)
+      case request.method
+      when Protocol::Methods::ROOTS_LIST
+        begin
+          result =
+            if handler = @on_roots_list
+              handler.call
+            else
+              Types::RootsListResult.new(roots: @roots)
+            end
+          send_result(request.id, result)
+        rescue ex
+          send_error(request.id, Protocol::Error::INTERNAL_ERROR, ex.message || "roots/list failed")
+        end
+      else
+        send_error(request.id, Protocol::Error::METHOD_NOT_FOUND, "Method #{request.method} not found")
+      end
+    end
+
+    private def handle_notification(notification : Protocol::Notification)
+      case notification.method
+      when Protocol::Methods::LOGGING_MESSAGE
+        params = notification.params
+        return if params.nil?
+        begin
+          payload = Types::LoggingMessageParams.from_json(params.to_json)
+          @on_logging_message.try &.call(payload)
+        rescue
+          # ignore malformed log notifications
+        end
+      else
+        # ignore unknown notifications
       end
     end
 
@@ -153,6 +288,19 @@ module Mcp
           nil
         )
       end
+    end
+
+    private def send_result(id : (String | Int64 | Nil), payload : JSON::Serializable)
+      return if id.nil?
+      @transport.send(Protocol::Result.new(Json.to_any(payload), id.not_nil!))
+    end
+
+    private def send_error(id : (String | Int64 | Nil), code : Int32, message : String)
+      error_resp = Protocol::Error.new(
+        Protocol::Error::ErrorData.new(code, message),
+        id
+      )
+      @transport.send(error_resp)
     end
   end
 end

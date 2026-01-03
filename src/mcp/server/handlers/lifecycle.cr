@@ -10,7 +10,10 @@ module Mcp
             protocol_version: "2024-11-05",
             capabilities: Types::Capabilities.new(
               tools: Types::ToolsCapabilities.new(list_changed: true),
-              roots: nil
+              resources: Types::ResourcesCapabilities.new(list_changed: true),
+              prompts: Types::PromptsCapabilities.new(list_changed: true),
+              logging: Types::LoggingCapabilities.new,
+              roots: Types::RootsCapabilities.new(list_changed: true)
             ),
             server_info: Types::ServerInfo.new(
               name: "Crystal MCP SDK",

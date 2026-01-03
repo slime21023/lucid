@@ -5,7 +5,8 @@ This documentation focuses on *how to use* Lucid (`require "lucid"` then use `Mc
 ## Chapters
 
 - Quick Start: `docs/quickstart.md`
-- Server (Tools): `docs/server.md`
+- Server: `docs/server.md`
 - Client (including typed APIs): `docs/client.md`
+- Transports: `docs/transports.md`
 - Testing & Coverage Reports: `docs/testing-and-coverage.md`
 - Architecture Overview: `docs/architecture.md`
